@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>jitter test</title></head>
+<body>
+<script>
+(function () {
+  var nb = {
+    id: 'jittertest',
+    title: 'Jitter test',
+    created: Date.now(),
+    updated: Date.now(),
+    cells: [
+      { id: 'c0', type: 'code', source: 'import time\nfor i in range(80):\n    print("line", i, "x" * 30)\n    time.sleep(0.015)', outputs: [], execCount: null, duration: null },
+      { id: 'c1', type: 'code', source: 'print("second cell")', outputs: [], execCount: null, duration: null },
+      { id: 'c2', type: 'code', source: 'print("third cell")', outputs: [], execCount: null, duration: null }
+    ]
+  };
+  var store = {};
+  store[nb.id] = nb;
+  localStorage.setItem('cobalt.notebooks.v2', JSON.stringify(store));
+  localStorage.setItem('cobalt.current.v2', nb.id);
+})();
+</script>
+<iframe id="f" src="/" style="width:100%;height:560px;border:0"></iframe>
+<pre id="out" style="font-size:10px"></pre>
+<script>
+(function () {
+  var f = document.getElementById('f');
+  var mode = location.hash.slice(1) || 'run';
+  f.addEventListener('load', function () {
+    var w = f.contentWindow, d = f.contentDocument;
+    setTimeout(function () {
+      var main = d.querySelector('#main');
+      var cell = d.querySelector('.cell[data-id="c0"]');
+      var next = d.querySelector('.cell[data-id="c1"]');
+      var samples = [];
+      var start = 0;
+      var last = null;
+      function sample() {
+        var r = cell.getBoundingClientRect();
+        var nr = next ? next.getBoundingClientRect() : { top: 0, bottom: 0 };
+        var outEl = d.querySelector('.outputs', cell);
+        var s = {
+          t: Math.round(performance.now() - start),
+          scrollTop: Math.round(main.scrollTop),
+          top: Math.round(r.top),
+          bottom: Math.round(r.bottom),
+          h: Math.round(r.height),
+          nextTop: Math.round(nr.top),
+          out: outEl ? outEl.textContent.length : 0,
+          running: cell.classList.contains('running')
+        };
+        if (!last || s.scrollTop !== last.scrollTop || s.h !== last.h || s.top !== last.top || s.out !== last.out) samples.push(s);
+        last = s;
+        if (performance.now() - start < 3500) return;
+        clearInterval(timer);
+        finish();
+      }
+      function finish() {
+        document.getElementById('out').textContent = JSON.stringify(samples);
+        document.title = 'DONE';
+      }
+      // Put the first cell near the bottom of the viewport so output growth
+      // and any auto-scroll behavior interact.
+      main.scrollTop = cell.offsetTop - main.clientHeight + 100;
+      start = performance.now();
+      if (mode === 'advance') {
+        var input = cell.querySelector('.CodeMirror textarea');
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', shiftKey: true, bubbles: true, cancelable: true }));
+      } else {
+        cell.querySelector('.run-btn').click();
+      }
+      var timer = setInterval(sample, 16);
+      sample();
+    }, 400);
+  });
+})();
+</script>
+</body>
+</html>

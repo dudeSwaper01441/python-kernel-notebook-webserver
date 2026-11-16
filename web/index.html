@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cobalt — Python notebooks in the browser</title>
+<meta name="description" content="A local-first Python notebook that runs real CPython and streams rich output into your browser.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/vendor/codemirror.min.css">
+<link rel="stylesheet" href="/vendor/show-hint.css">
+<link rel="stylesheet" href="/css/app.css">
+<script>
+  // Apply the saved theme before first paint.
+  (function () {
+    try {
+      var saved = localStorage.getItem('cobalt.theme');
+      var system = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      document.documentElement.dataset.theme = saved || system;
+    } catch (e) { document.documentElement.dataset.theme = 'dark'; }
+  })();
+  // Surface boot failures when running headless / without devtools.
+  window.__cobaltErrors = [];
+  window.addEventListener('error', function (event) {
+    window.__cobaltErrors.push(String(event.message));
+    document.documentElement.setAttribute('data-js-error', String(event.message));
+  });
+  window.addEventListener('unhandledrejection', function (event) {
+    window.__cobaltErrors.push(String(event.reason));
+    document.documentElement.setAttribute('data-js-error', String(event.reason));
+  });
+</script>
+</head>
+<body>
+
+<svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5-13-7.5z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-chevron-up" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M10 14h4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-panel-left" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></symbol>
+  <symbol id="i-command" viewBox="0 0 24 24"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 0 0 0-6z"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></symbol>
+  <symbol id="i-bold" viewBox="0 0 24 24"><path d="M7 5h6a4 4 0 0 1 0 8H7zM7 13h7a4 4 0 0 1 0 8H7z"/></symbol>
+  <symbol id="i-italic" viewBox="0 0 24 24"><path d="M19 4h-8M13 20H5M15 4L9 20"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+  <symbol id="i-quote" viewBox="0 0 24 24"><path d="M4 20c3 0 6-1 6-7V5H4v7h4c0 4-1 5-4 6zM14 20c3 0 6-1 6-7V5h-6v7h4c0 4-1 5-4 6z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></symbol>
+  <symbol id="i-circle-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="icon-btn" id="sidebar-toggle" title="Toggle sidebar" aria-label="Toggle sidebar">
+        <svg class="icon"><use href="#i-panel-left"/></svg>
+      </button>
+      <a class="brand" href="/" aria-label="Cobalt">
+        <span class="brand-mark" aria-hidden="true">C</span>
+        <span class="brand-name">Cobalt</span>
+      </a>
+      <span class="crumb-sep">/</span>
+      <span class="crumb" id="crumb-title">Untitled notebook</span>
+    </div>
+    <div class="topbar-right">
+      <button class="kernel-pill" id="kernel-pill" title="Runtime details" aria-haspopup="dialog">
+        <span class="status-dot" id="kernel-dot"></span>
+        <span id="kernel-label">Starting…</span>
+        <svg class="icon chev"><use href="#i-chevron-down"/></svg>
+      </button>
+      <div class="divider-v"></div>
+      <button class="icon-btn danger" id="stop-btn" title="Interrupt execution" aria-label="Interrupt execution" hidden>
+        <svg class="icon"><use href="#i-stop"/></svg>
+      </button>
+      <button class="btn primary" id="run-all-btn">
+        <svg class="icon"><use href="#i-play"/></svg>
+        <span>Run all</span>
+      </button>
+      <button class="icon-btn" id="theme-toggle" title="Toggle theme (Ctrl+J)" aria-label="Toggle theme">
+        <svg class="icon theme-icon-sun"><use href="#i-sun"/></svg>
+        <svg class="icon theme-icon-moon"><use href="#i-moon"/></svg>
+      </button>
+      <button class="icon-btn" id="shortcuts-btn" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">
+        <svg class="icon"><use href="#i-keyboard"/></svg>
+      </button>
+      <div class="menu-anchor">
+        <button class="icon-btn" id="menu-btn" title="Notebook actions" aria-label="Notebook actions" aria-haspopup="menu">
+          <svg class="icon"><use href="#i-download"/></svg>
+        </button>
+        <div class="dropdown" id="menu-dropdown" role="menu" hidden>
+          <button class="menu-item" data-action="export-ipynb" role="menuitem">
+            <svg class="icon"><use href="#i-download"/></svg><span>Download .ipynb</span>
+          </button>
+          <button class="menu-item" data-action="export-py" role="menuitem">
+            <svg class="icon"><use href="#i-file"/></svg><span>Download .py</span>
+          </button>
+          <button class="menu-item" data-action="import" role="menuitem">
+            <svg class="icon"><use href="#i-upload"/></svg><span>Import .ipynb…</span>
+          </button>
+          <div class="menu-sep"></div>
+          <button class="menu-item" data-action="duplicate" role="menuitem">
+            <svg class="icon"><use href="#i-copy"/></svg><span>Duplicate notebook</span>
+          </button>
+          <button class="menu-item" data-action="clear-outputs" role="menuitem">
+            <svg class="icon"><use href="#i-refresh"/></svg><span>Clear all outputs</span>
+          </button>
+          <button class="menu-item" data-action="restart" role="menuitem">
+            <svg class="icon"><use href="#i-zap"/></svg><span>Restart runtime</span>
+          </button>
+          <div class="menu-sep"></div>
+          <button class="menu-item" data-action="new" role="menuitem">
+            <svg class="icon"><use href="#i-plus"/></svg><span>New notebook</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-inner">
+        <button class="new-nb" id="new-nb-btn">
+          <svg class="icon"><use href="#i-plus"/></svg>
+          <span>New notebook</span>
+        </button>
+
+        <div class="segmented" id="sidebar-tabs" role="tablist">
+          <button class="seg active" data-tab="notebooks" role="tab" aria-selected="true">Notebooks</button>
+          <button class="seg" data-tab="variables" role="tab" aria-selected="false">
+            Variables <span class="badge" id="vars-badge" hidden>0</span>
+          </button>
+        </div>
+
+        <div class="panel" data-panel="notebooks">
+          <div class="panel-label">Recent</div>
+          <div class="nb-list" id="nb-list"></div>
+          <button class="example-card" id="examples-btn">
+            <span class="example-icon"><svg class="icon"><use href="#i-file"/></svg></span>
+            <span class="example-text">
+              <strong>Sample notebook</strong>
+              <small>Kernel state, output, plotting</small>
+            </span>
+            <svg class="icon example-arrow"><use href="#i-arrow-right"/></svg>
+          </button>
+        </div>
+
+        <div class="panel" data-panel="variables" hidden>
+          <div class="panel-label-row">
+            <span class="panel-label">In memory</span>
+            <button class="mini-btn" id="vars-refresh">
+              <svg class="icon"><use href="#i-refresh"/></svg>
+            </button>
+          </div>
+          <div class="vars-list" id="vars-list"></div>
+        </div>
+      </div>
+
+      <div class="runtime-card">
+        <div class="runtime-top">
+          <span class="status-dot" id="runtime-dot"></span>
+          <span class="runtime-title">Local runtime</span>
+          <span class="runtime-state" id="runtime-state">Starting</span>
+        </div>
+        <div class="runtime-meta" id="runtime-meta">Booting CPython…</div>
+        <div class="runtime-actions">
+          <button class="mini-btn" id="restart-btn">
+            <svg class="icon"><use href="#i-refresh"/></svg><span>Restart</span>
+          </button>
+          <button class="mini-btn" id="clear-btn">
+            <svg class="icon"><use href="#i-trash"/></svg><span>Clear outputs</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <main class="main" id="main">
+      <div class="run-progress" id="run-progress" hidden></div>
+      <div class="notebook">
+        <div class="nb-head">
+          <div class="nb-title-row">
+            <input id="nb-title" class="nb-title" value="Untitled notebook" spellcheck="false" autocomplete="off" aria-label="Notebook title">
+            <span class="save-state" id="save-state"><span class="save-dot"></span><span id="save-label">Saved</span></span>
+          </div>
+          <div class="nb-meta">
+            <span id="meta-cells">0 cells</span>
+            <span class="dot-sep"></span>
+            <span id="meta-kernel">Python</span>
+            <span class="dot-sep hint-sep"></span>
+            <span class="meta-hint">Shift + Enter to run · Ctrl + K for commands</span>
+          </div>
+        </div>
+
+        <div id="cells" class="cells"></div>
+
+        <div class="nb-footer">
+          <button class="add-btn" id="add-code-btn">
+            <svg class="icon"><use href="#i-plus"/></svg><span>Code</span>
+          </button>
+          <button class="add-btn" id="add-md-btn">
+            <svg class="icon"><use href="#i-plus"/></svg><span>Text</span>
+          </button>
+          <span class="footer-hint">Autosaved to <code>notebooks/</code></span>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div id="modal-root"></div>
+<input type="file" id="file-input" accept=".ipynb,application/json" hidden>
+
+<script src="/vendor/codemirror.min.js"></script>
+<script src="/vendor/python.min.js"></script>
+<script src="/vendor/markdown.min.js"></script>
+<script src="/vendor/matchbrackets.min.js"></script>
+<script src="/vendor/closebrackets.min.js"></script>
+<script src="/vendor/comment.min.js"></script>
+<script src="/vendor/show-hint.min.js"></script>
+<script src="/vendor/active-line.min.js"></script>
+<script src="/vendor/continuelist.min.js"></script>
+<script src="/vendor/placeholder.min.js"></script>
+<script src="/vendor/marked.min.js"></script>
+<script src="/vendor/purify.min.js"></script>
+<script src="/vendor/highlight.min.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>
